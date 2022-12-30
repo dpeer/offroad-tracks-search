@@ -1,17 +1,19 @@
 import fs from 'fs';
 import axios from 'axios';
 import users from './input/user-ids.json' assert {type: 'json'};
+import path from 'path';
 
 const baseTrackUrl = 'https://off-road.io/track/';
 const baseSearchUrl = 'https://tracks.off-road.io/v1/tracks?limit=200&query=';
 const baseLegacySearchUrl = 'https://api.off-road.io/_ah/api/tracks/filter?activityType=OffRoading';
 const baseByUserUrl = 'https://api.off-road.io/_ah/api/offroadApi/v2/getMoreByUser/';
-const rawDir = 'output/raw';
-const partialDir = 'output/partial';
+const outputDir = 'output';
+const rawDir = path.join(outputDir, 'raw');
+const partialDir = path.join(outputDir, 'partial');
 
-const user = users.find(user => user.ownerDisplayName === 'shay lazmi');
+const user = users.find(user => user.ownerDisplayName === '');
 const filters = {
-     query: '',
+     freeText: '',
      adventureUserId: user ? user.myAdventureUserId : null,
      minGrade: 4,
      minReviws: 2,
@@ -19,9 +21,9 @@ const filters = {
      maxDistance: 60,
      minDistance: 20,
      minDate: new Date('2018-01-01T00:00:00'),
-     geoArea: 'NEGEV_NORTH', // [CARMEL_RAMOT_MENASHE, JERUSALEM_MOUNT_SHFELA, NEGEV_CENTER_MACHTESHIM, NEGEV_NORTH]
+     geoArea: 'DEAD_SEA_MIDBAR_YEHIDA', // [CARMEL_RAMOT_MENASHE, JERUSALEM_MOUNT_SHFELA, NEGEV_CENTER_MACHTESHIM, NEGEV_NORTH, DEAD_SEA_MIDBAR_YEHIDA, HERMON_GOLAN_ETZBA_GALIL]
 };
-filters.query = filters.query ?? '';
+filters.freeText = filters.freeText ?? '';
 const allTracks = [];
 
 const main = async () => {
@@ -33,11 +35,12 @@ const main = async () => {
      await getTracksByUser();
 
      console.log(`\nUnique tracks count: ${allTracks.length}`);
-     fs.writeFileSync('output/all-tracks.json', JSON.stringify(allTracks.sort((a, b) => a.title && b.title ? a.title.localeCompare(b.title) : 1), null, 4));
+     const sortedTracks = allTracks.sort((a, b) => a.title && b.title ? a.title.localeCompare(b.title) : 1);
+     writeFilePrettySync(path.join(outputDir, 'all-tracks.json'), sortedTracks);
 }
 
 const getTracks = async () => {
-     const tracksUrl = baseSearchUrl + filters.query;
+     const tracksUrl = baseSearchUrl + filters.freeText;
      const response = await axios.get(encodeURI(tracksUrl));
      console.log('\nTracks URL: ' + tracksUrl);
 
@@ -48,11 +51,11 @@ const getTracks = async () => {
 
      console.log(`Tracks count = ${tracks.length}`);
 
-     fs.writeFileSync(`${rawDir}/tracks-raw.json`, JSON.stringify(tracks, null, 4));
+     writeFilePrettySync(`${rawDir}/tracks-raw.json`, tracks);
 
      tracks = tracks.map(track => mapTrack(track));
 
-     fs.writeFileSync(`${partialDir}/tracks.json`, JSON.stringify(tracks, null, 4));
+     writeFilePrettySync(path.join(partialDir, 'tracks.json'), tracks);
 
      addToAllTracks(tracks);
 };
@@ -87,11 +90,11 @@ const getLegacyTracks = async () => {
      
      console.log(`Legacy tracks count = ${tracks.length}`);
 
-     fs.writeFileSync(`${rawDir}/legacy-tracks-raw.json`, JSON.stringify(tracks, null, 4));
+     writeFilePrettySync(`${rawDir}/legacy-tracks-raw.json`, tracks);
 
      tracks = tracks.map(track => mapLegacyTrack(track));
 
-     fs.writeFileSync(`${partialDir}/legacy-tracks.json`, JSON.stringify(tracks, null, 4));
+     writeFilePrettySync(path.join(partialDir, 'legacy-tracks.json'), tracks);
 
      addToAllTracks(tracks);
 };
@@ -111,11 +114,11 @@ const getTracksByUser = async () => {
 
      console.log(`Tracks by user count = ${tracks.length}`);
 
-     fs.writeFileSync(`${rawDir}/tracks-by-user-raw.json`, JSON.stringify(tracks, null, 4));
+     writeFilePrettySync(`${rawDir}/tracks-by-user-raw.json`, tracks);
 
      tracks = tracks.map(track => mapLegacyTrack(track));
 
-     fs.writeFileSync(`${partialDir}/tracks-by-user.json`, JSON.stringify(tracks, null, 4));
+     writeFilePrettySync(path.join(partialDir, 'tracks-by-user.json'), tracks);
 
      addToAllTracks(tracks);
 };
@@ -162,11 +165,11 @@ function filterTracks(tracks, isLegacy) {
      if (filters.minDate) {
           tracks = tracks.filter(track => new Date(track.created) - filters.minDate > 0 || new Date(track.created) - filters.minDate);
      }
-     if (filters.query) {
+     if (filters.freeText) {
           tracks = tracks.filter(track => 
-               (track.title && track.title.includes(filters.query)) || 
-               (track.description && track.description.includes(filters.query)) ||
-               (track.shortDescription && track.shortDescription.includes(filters.query)));
+               (track.title && track.title.includes(filters.freeText)) || 
+               (track.description && track.description.includes(filters.freeText)) ||
+               (track.shortDescription && track.shortDescription.includes(filters.freeText)));
      }
 
      return tracks;
@@ -201,13 +204,13 @@ function mapLegacyTrack(track) {
 function parseDifficultyLevel(difficultyLevel) {
      switch (difficultyLevel) {
           case 5:
-               return 'קשה'
+               return 'Hard'
           case 3:
-               return 'בינוני';
+               return 'Moderate';
           case 1:
-               return 'קל';
+               return 'Easy';
           default:
-               return '';
+               return 'N/A';
      }
 }
 
@@ -215,6 +218,10 @@ function createDirIfNotExists(dir) {
      if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
      }
+}
+
+function writeFilePrettySync(path, data) {
+     fs.writeFileSync(path, JSON.stringify(data, null, 4));
 }
 
 main();
