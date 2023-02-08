@@ -18,7 +18,7 @@ const filters = {
      minGrade: 4,
      minReviws: 2,
      difficultyLevels: [1,3,5], // (1 = easy, 3 = moderate, 5 = hard)
-     maxDistance: 30,
+     maxDistance: 80,
      minDistance: 20,
      minDate: new Date('2018-01-01T00:00:00'),
      geoArea: 'GALIL_BOT_AMAKIM_GILBOA',
