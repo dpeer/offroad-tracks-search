@@ -18,16 +18,16 @@ const filters = {
      minGrade: 4,
      minReviws: 2,
      difficultyLevels: [1,3,5], // (1 = easy, 3 = moderate, 5 = hard)
-     maxDistance: 80,
+     maxDistance: 30,
      minDistance: 20,
      minDate: new Date('2018-01-01T00:00:00'),
-     // [CARMEL_RAMOT_MENASHE, JERUSALEM_MOUNT_SHFELA, NEGEV_CENTER_MACHTESHIM, NEGEV_NORTH, DEAD_SEA_MIDBAR_YEHIDA, GALIL_BOT_AMAKIM_GILBOA, HERMON_GOLAN_ETZBA_GALIL, SHOMRON_BINYAMIN]
      geoArea: 'GALIL_BOT_AMAKIM_GILBOA',
 };
-filters.freeText = filters.freeText ?? '';
 const allTracks = [];
 
-const main = async () => {
+await searchTracks();
+
+async function searchTracks() {
      createDirIfNotExists(rawDir);
      createDirIfNotExists(partialDir);
 
@@ -38,7 +38,7 @@ const main = async () => {
      writeFilePrettySync(path.join(outputDir, 'all-tracks.json'), sortedTracks);
 }
 
-const getTracks = async () => {
+async function getTracks() {
      const tracksUrl = baseSearchUrl + filters.freeText;
      const response = await axios.get(encodeURI(tracksUrl));
      console.log('\nTracks URL: ' + tracksUrl);
@@ -57,9 +57,9 @@ const getTracks = async () => {
      writeFilePrettySync(path.join(partialDir, 'tracks.json'), tracks);
 
      addToAllTracks(tracks);
-};
+}
 
-const getLegacyTracks = async () => {
+async function getLegacyTracks() {
      let tracksUrl = baseLegacySearchUrl;
      let difficultyLevels = '';
      if (filters.difficultyLevels && filters.difficultyLevels.length) {
@@ -96,9 +96,9 @@ const getLegacyTracks = async () => {
      writeFilePrettySync(path.join(partialDir, 'legacy-tracks.json'), tracks);
 
      addToAllTracks(tracks);
-};
+}
 
-const getTracksByUser = async () => {
+async function getTracksByUser() {
      if (!filters.adventureUserId) {
           return;
      }
@@ -134,6 +134,8 @@ function addToAllTracks(tracks) {
 }
 
 function filterTracks(tracks, isLegacy) {
+     const trackDistanceGetter = (track) => isLegacy ? track.layersStatistics.distance : track.distance;
+
      tracks = tracks.filter(track => track.activityType === "OffRoading");
      if (filters.difficultyLevels && filters.difficultyLevels.length) {
           tracks = tracks.filter(track => filters.difficultyLevels.includes(track.difficultyLevel));
@@ -142,23 +144,15 @@ function filterTracks(tracks, isLegacy) {
           tracks = tracks.filter(track => track.area === filters.geoArea);
      }
      if (filters.minDistance) {
-          if (isLegacy) {
-               tracks = tracks.filter(track => track.layersStatistics.distance >= filters.minDistance || track.layersStatistics.distance == null);
-          } else {
-               tracks = tracks.filter(track => track.distance >= filters.minDistance || track.distance == null);
-          }
+          tracks = tracks.filter(track => (trackDistanceGetter(track) ?? Number.MAX_SAFE_INTEGER) >= filters.minDistance);
      }
      if (filters.maxDistance) {
-          if (isLegacy) {
-               tracks = tracks.filter(track => track.layersStatistics.distance <= filters.maxDistance || track.layersStatistics.distance == null);
-          } else {
-               tracks = tracks.filter(track => track.distance <= filters.maxDistance || track.distance == null);
-          }
+          tracks = tracks.filter(track => (trackDistanceGetter(track) ?? 0) <= filters.maxDistance);
      }
      if (filters.minGrade) {
           tracks = tracks.filter(track => track.grade >= filters.minGrade);
      }
-    if (filters.minReviws) {
+     if (filters.minReviws) {
           tracks = tracks.filter(track => track.reviews >= filters.minReviws);
      }
      if (filters.minDate) {
@@ -174,6 +168,10 @@ function filterTracks(tracks, isLegacy) {
      return tracks;
 }
 
+function dateParser(time) {
+     return new Date(time).toISOString().substring(0, 10);
+}
+
 function mapTrack(track) {
      return {
           url: baseTrackUrl + track.id,
@@ -182,8 +180,8 @@ function mapTrack(track) {
           distance: Math.trunc(track.distance),
           duration: new Date(+track.duration).toISOString().substring(11, 19),
           area: track.area,
-          created: new Date(track.created).toISOString().substring(0, 10),
-          updated: new Date(track.updated).toISOString().substring(0, 10),
+          created: dateParser(track.created),
+          updated: dateParser(track.updated),
           grade: track.grade,
           reviews: track.reviews,
           ownerDisplayName: track.ownerDisplayName
@@ -191,13 +189,12 @@ function mapTrack(track) {
 }
 
 function mapLegacyTrack(track) {
-     let mappedTrack = mapTrack(track);
-     mappedTrack.description = track.description;
-     mappedTrack.shortDescription = track.shortDescription;
-     if (track.layersStatistics) {
-          mappedTrack.distance = track.layersStatistics.distance;
-     }
-     return mappedTrack;
+     return {
+          ...mapTrack(track),
+          description: track.description,
+          shortDescription: track.shortDescription,
+          distance: track.layersStatistics ? track.layersStatistics.distance : null
+     };
 }
 
 function parseDifficultyLevel(difficultyLevel) {
@@ -222,5 +219,3 @@ function createDirIfNotExists(dir) {
 function writeFilePrettySync(path, data) {
      fs.writeFileSync(path, JSON.stringify(data, null, 4));
 }
-
-main();
