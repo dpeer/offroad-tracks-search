@@ -1,6 +1,6 @@
 import fs from 'fs';
 import axios from 'axios';
-import users from './input/user-ids.json' assert {type: 'json'};
+import {users} from './input/user-ids.js';
 import path from 'path';
 
 const baseTrackUrl = 'https://off-road.io/track/';
@@ -17,11 +17,12 @@ const filters = {
      adventureUserId: user ? user.myAdventureUserId : null,
      minGrade: 4,
      minReviws: 2,
-     difficultyLevels: [3,5], // (1 = easy, 3 = moderate, 5 = hard)
-     maxDistance: 60,
+     difficultyLevels: [1,3,5], // (1 = easy, 3 = moderate, 5 = hard)
+     maxDistance: 80,
      minDistance: 20,
      minDate: new Date('2018-01-01T00:00:00'),
-     geoArea: 'DEAD_SEA_MIDBAR_YEHIDA', // [CARMEL_RAMOT_MENASHE, JERUSALEM_MOUNT_SHFELA, NEGEV_CENTER_MACHTESHIM, NEGEV_NORTH, DEAD_SEA_MIDBAR_YEHIDA, HERMON_GOLAN_ETZBA_GALIL]
+     // [CARMEL_RAMOT_MENASHE, JERUSALEM_MOUNT_SHFELA, NEGEV_CENTER_MACHTESHIM, NEGEV_NORTH, DEAD_SEA_MIDBAR_YEHIDA, GALIL_BOT_AMAKIM_GILBOA, HERMON_GOLAN_ETZBA_GALIL, SHOMRON_BINYAMIN]
+     geoArea: 'GALIL_BOT_AMAKIM_GILBOA',
 };
 filters.freeText = filters.freeText ?? '';
 const allTracks = [];
@@ -30,9 +31,7 @@ const main = async () => {
      createDirIfNotExists(rawDir);
      createDirIfNotExists(partialDir);
 
-     await getTracks();
-     await getLegacyTracks();
-     await getTracksByUser();
+     await Promise.allSettled([getTracks(), getLegacyTracks(), getTracksByUser()]);
 
      console.log(`\nUnique tracks count: ${allTracks.length}`);
      const sortedTracks = allTracks.sort((a, b) => a.title && b.title ? a.title.localeCompare(b.title) : 1);
