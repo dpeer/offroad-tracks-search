@@ -10,6 +10,7 @@ const baseByUserUrl = 'https://api.off-road.io/_ah/api/offroadApi/v2/getMoreByUs
 const outputDir = 'output';
 const rawDir = path.join(outputDir, 'raw');
 const partialDir = path.join(outputDir, 'partial');
+const outputFile = path.join(outputDir, 'all-tracks.json');
 
 const user = users.find(user => user.ownerDisplayName === '');
 const filters = {
@@ -33,9 +34,9 @@ async function searchTracks() {
 
      await Promise.allSettled([getTracks(), getLegacyTracks(), getTracksByUser()]);
 
-     console.log(`\nUnique tracks count: ${allTracks.length}`);
+     console.log(`\nUnique tracks count: ${allTracks.length} in file: ${outputFile}`);
      const sortedTracks = allTracks.sort((a, b) => a.title && b.title ? a.title.localeCompare(b.title) : 1);
-     writeFilePrettySync(path.join(outputDir, 'all-tracks.json'), sortedTracks);
+     writeFilePrettySync(outputFile, sortedTracks);
 }
 
 async function getTracks() {
